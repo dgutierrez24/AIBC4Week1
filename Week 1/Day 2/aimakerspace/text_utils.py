@@ -1,6 +1,6 @@
 import os
 from typing import List
-
+import fitz  # PyMuPDF
 
 class TextFileLoader:
     def __init__(self, path: str, encoding: str = "utf-8"):
@@ -11,16 +11,30 @@ class TextFileLoader:
     def load(self):
         if os.path.isdir(self.path):
             self.load_directory()
-        elif os.path.isfile(self.path) and self.path.endswith(".txt"):
-            self.load_file()
+        elif os.path.isfile(self.path):
+            if self.path.endswith(".txt"):
+                self.load_text_file()
+            elif self.path.endswith(".pdf"):
+                self.load_pdf_file()
+            else:
+                raise ValueError(
+                    "Provided path is neither a valid directory, .txt file, nor .pdf file."
+                )
         else:
             raise ValueError(
-                "Provided path is neither a valid directory nor a .txt file."
+                "Provided path is neither a valid directory nor a file."
             )
 
-    def load_file(self):
+    def load_text_file(self):
         with open(self.path, "r", encoding=self.encoding) as f:
             self.documents.append(f.read())
+
+    def load_pdf_file(self):
+        with fitz.open(self.path) as doc:
+            text = ""
+            for page in doc:
+                text += page.get_text()  # Extract text from each page
+            self.documents.append(text)
 
     def load_directory(self):
         for root, _, files in os.walk(self.path):
@@ -30,6 +44,12 @@ class TextFileLoader:
                         os.path.join(root, file), "r", encoding=self.encoding
                     ) as f:
                         self.documents.append(f.read())
+                elif file.endswith(".pdf"):
+                    with fitz.open(os.path.join(root, file)) as doc:
+                        text = ""
+                        for page in doc:
+                            text += page.get_text()
+                        self.documents.append(text)
 
     def load_documents(self):
         self.load()
@@ -63,7 +83,7 @@ class CharacterTextSplitter:
 
 
 if __name__ == "__main__":
-    loader = TextFileLoader("data/KingLear.txt")
+    loader = TextFileLoader("data/test.pdf")
     loader.load()
     splitter = CharacterTextSplitter()
     chunks = splitter.split_texts(loader.documents)
